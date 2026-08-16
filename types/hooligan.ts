@@ -27,6 +27,12 @@ export interface HooliganTraits {
   substancePreference?: SubstancePreference;
   hasAlcoholProblem: boolean;
   hateTriggers: HateTrigger[];
+  /**
+   * Zichtbare eigenschappen van deze hooligan zelf (tattoo, snor, ...). Tegenstanders met de
+   * bijbehorende `hateTrigger` krijgen hierdoor een haat-bonus richting deze hooligan tijdens het
+   * gevecht. Zie design §7.
+   */
+  visibleTraits: Exclude<HateTrigger, "rivaliserende-club">[];
 }
 
 /**
