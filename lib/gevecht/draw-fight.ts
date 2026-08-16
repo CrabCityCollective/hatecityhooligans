@@ -85,6 +85,29 @@ function drawCombatant(
   ctx.restore();
 }
 
+function drawPoliceGauge(ctx: CanvasRenderingContext2D, fight: FightState): void {
+  const barWidth = fight.config.fieldWidth - 40;
+  const barHeight = 10;
+  const x = 20;
+  const y = 12;
+  const ratio = fight.policeGaugePercent / 100;
+
+  ctx.save();
+  ctx.fillStyle = "#1f2937";
+  ctx.fillRect(x, y, barWidth, barHeight);
+  ctx.fillStyle = ratio >= 1 ? "#ef4444" : "#3b82f6";
+  ctx.fillRect(x, y, barWidth * ratio, barHeight);
+  ctx.strokeStyle = "#9ca3af";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, barWidth, barHeight);
+
+  ctx.fillStyle = "#f9fafb";
+  ctx.font = "11px sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(`Politie-meter: ${Math.round(fight.policeGaugePercent)}%`, x, y + barHeight + 14);
+  ctx.restore();
+}
+
 /** Tekent het volledige gevechtsveld (top-down) op canvas op basis van de huidige fight-state. */
 export function drawFight(canvas: HTMLCanvasElement, fight: FightState): void {
   const ctx = canvas.getContext("2d");
@@ -97,4 +120,6 @@ export function drawFight(canvas: HTMLCanvasElement, fight: FightState): void {
     if (combatant.state === "fled") continue;
     drawCombatant(ctx, combatant, fight.combatants);
   }
+
+  drawPoliceGauge(ctx, fight);
 }

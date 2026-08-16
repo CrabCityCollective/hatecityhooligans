@@ -35,3 +35,7 @@ export function heeftVechtsportTrait(hooligan: Hooligan): boolean {
     (trait) => trait === "kickboksen" || trait === "karate",
   );
 }
+
+export function heeftBivakmuts(hooligan: Hooligan): boolean {
+  return hooligan.equipment.some((item) => item.id === "bivakmuts");
+}

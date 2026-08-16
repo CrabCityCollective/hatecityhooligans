@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import type { GameState, Hooligan } from "@/types";
+import type { FightResult } from "@/lib/gevecht/types";
 import { PHASE_ORDER } from "@/lib/week-phase";
 
 const INITIAL_STATE: GameState = {
@@ -26,6 +27,11 @@ interface GameStore extends GameState {
   setPoliceGaugePercent: (percent: number) => void;
   addHooligan: (hooligan: Hooligan) => void;
   removeHooligan: (hooliganId: string) => void;
+  /**
+   * Verwerkt de uitkomst van een afgelopen gevecht: markeert opgepakte hooligans in het roster als
+   * tijdelijk/permanent verloren (design §3) en zet de politie-meter-startwaarde voor volgende week.
+   */
+  applyFightResult: (result: FightResult) => void;
 }
 
 export const useGameStore = create<GameStore>((set) => ({
@@ -59,4 +65,30 @@ export const useGameStore = create<GameStore>((set) => ({
         roster: state.gang.roster.filter((h) => h.id !== hooliganId),
       },
     })),
+  applyFightResult: (result) =>
+    set((state) => {
+      const arrestsByHooliganId = new Map(
+        result.arrests.map((arrest) => [arrest.hooliganId, arrest]),
+      );
+
+      const roster = state.gang.roster.map((hooligan) => {
+        const arrest = arrestsByHooliganId.get(hooligan.id);
+        if (!arrest) return hooligan;
+
+        if (arrest.outcome.type === "permanent") {
+          return { ...hooligan, status: "dead" as const };
+        }
+
+        return {
+          ...hooligan,
+          status: "unavailable" as const,
+          unavailableUntilWeek: state.currentWeek + (arrest.outcome.weeks ?? 1),
+        };
+      });
+
+      return {
+        gang: { ...state.gang, roster },
+        policeGaugePercent: result.nextPoliceGaugeStartPercent,
+      };
+    }),
 }));

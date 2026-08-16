@@ -3,22 +3,35 @@
 import { useEffect, useRef } from "react";
 import type { Hooligan } from "@/types";
 import { drawFight } from "@/lib/gevecht/draw-fight";
-import { createFight, stepFight } from "@/lib/gevecht/simulation";
+import { DEFAULT_FIGHT_CONFIG, createFight, stepFight } from "@/lib/gevecht/simulation";
 import type { FightResult, FightState } from "@/lib/gevecht/types";
 
 interface FightCanvasProps {
   playerRoster: Hooligan[];
+  /** Huidige beruchtheid van de gang: bepaalt hoe snel de politie-meter oploopt (design §2). */
+  notoriety: number;
+  /** Startwaarde van de politie-meter, bv. verhoogd door verraad bij een vorige arrestatie. */
+  startingPoliceGaugePercent: number;
   onFinish: (result: FightResult) => void;
 }
 
 /** Maximale tijdstap per animatieframe, zodat een korte hik in de browser geen grote sprong geeft. */
 const MAX_TICK_SECONDS = 0.1;
 
-export function FightCanvas({ playerRoster, onFinish }: FightCanvasProps) {
+export function FightCanvas({
+  playerRoster,
+  notoriety,
+  startingPoliceGaugePercent,
+  onFinish,
+}: FightCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const initialFightRef = useRef<FightState | null>(null);
   if (initialFightRef.current === null) {
-    initialFightRef.current = createFight(playerRoster);
+    initialFightRef.current = createFight(playerRoster, {
+      ...DEFAULT_FIGHT_CONFIG,
+      notoriety,
+      startingPoliceGaugePercent,
+    });
   }
   const initialFight = initialFightRef.current;
 

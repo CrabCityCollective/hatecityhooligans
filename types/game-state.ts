@@ -10,7 +10,7 @@ export interface GameState {
   currentWeek: number;
   currentPhase: WeekPhase;
   division: Division;
-  /** 0-100: hoe voller de meter, hoe groter de kans dat achterblijvers opgepakt worden. */
+  /** 0-100: startwaarde van de politie-meter voor het volgende gevecht (hoger na verraad, zie design §3). */
   policeGaugePercent: number;
   gang: Gang;
 }
