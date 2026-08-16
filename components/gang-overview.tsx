@@ -1,10 +1,12 @@
 "use client";
 
 import { useGameStore } from "@/lib/store/use-game-store";
+import { PHASE_LABELS } from "@/lib/week-phase";
 
 export function GangOverview() {
   const gang = useGameStore((state) => state.gang);
   const currentWeek = useGameStore((state) => state.currentWeek);
+  const currentPhase = useGameStore((state) => state.currentPhase);
   const division = useGameStore((state) => state.division);
   const policeGaugePercent = useGameStore((state) => state.policeGaugePercent);
 
@@ -14,6 +16,8 @@ export function GangOverview() {
       <dl>
         <dt>Week</dt>
         <dd>{currentWeek}</dd>
+        <dt>Fase</dt>
+        <dd>{PHASE_LABELS[currentPhase]}</dd>
         <dt>Divisie</dt>
         <dd>{division}</dd>
         <dt>Politie-meter</dt>
