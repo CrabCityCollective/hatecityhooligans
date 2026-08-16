@@ -2,9 +2,11 @@
 
 import { create } from "zustand";
 import type { GameState, Hooligan } from "@/types";
+import { PHASE_ORDER } from "@/lib/week-phase";
 
 const INITIAL_STATE: GameState = {
   currentWeek: 1,
+  currentPhase: "voorbereiding",
   division: 3,
   policeGaugePercent: 0,
   gang: {
@@ -19,6 +21,8 @@ const INITIAL_STATE: GameState = {
 
 interface GameStore extends GameState {
   advanceWeek: () => void;
+  /** Gaat naar de volgende fase. Na de laatste fase (resultaat) begint een nieuwe week bij voorbereiding. */
+  advancePhase: () => void;
   setPoliceGaugePercent: (percent: number) => void;
   addHooligan: (hooligan: Hooligan) => void;
   removeHooligan: (hooliganId: string) => void;
@@ -28,6 +32,20 @@ export const useGameStore = create<GameStore>((set) => ({
   ...INITIAL_STATE,
   advanceWeek: () =>
     set((state) => ({ currentWeek: state.currentWeek + 1 })),
+  advancePhase: () =>
+    set((state) => {
+      const currentIndex = PHASE_ORDER.indexOf(state.currentPhase);
+      const isLastPhase = currentIndex === PHASE_ORDER.length - 1;
+
+      if (isLastPhase) {
+        return {
+          currentPhase: PHASE_ORDER[0],
+          currentWeek: state.currentWeek + 1,
+        };
+      }
+
+      return { currentPhase: PHASE_ORDER[currentIndex + 1] };
+    }),
   setPoliceGaugePercent: (percent) =>
     set({ policeGaugePercent: Math.max(0, Math.min(100, percent)) }),
   addHooligan: (hooligan) =>
