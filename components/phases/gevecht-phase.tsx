@@ -1,30 +1,49 @@
 "use client";
 
+import { useState } from "react";
+import { FightCanvas } from "@/components/gevecht/fight-canvas";
+import { FightResultScreen } from "@/components/gevecht/fight-result-screen";
+import type { FightResult } from "@/lib/gevecht/types";
 import { useGameStore } from "@/lib/store/use-game-store";
 
+type FightPhaseState = "not-started" | "in-progress" | "finished";
+
 export function GevechtPhase() {
-  const division = useGameStore((state) => state.division);
-  const policeGaugePercent = useGameStore((state) => state.policeGaugePercent);
   const roster = useGameStore((state) => state.gang.roster);
+  const [phaseState, setPhaseState] = useState<FightPhaseState>("not-started");
+  const [result, setResult] = useState<FightResult | null>(null);
+  const [fightKey, setFightKey] = useState(0);
+
+  const handleStart = () => {
+    setResult(null);
+    setPhaseState("in-progress");
+    setFightKey((key) => key + 1);
+  };
+
+  const handleFinish = (fightResult: FightResult) => {
+    setResult(fightResult);
+    setPhaseState("finished");
+  };
 
   return (
     <section>
       <h1>Gevecht</h1>
-      <dl>
-        <dt>Divisie</dt>
-        <dd>{division}</dd>
-        <dt>Politie-meter</dt>
-        <dd>{policeGaugePercent}%</dd>
-        <dt>Beschikbare hooligans</dt>
-        <dd>{roster.length}</dd>
-      </dl>
 
-      {/* TODO(gevecht-simulatie): top-down vrij-voor-allen simulatie — opstelling, targeting,
-          duels, KO/politie-afbreking — zie design §1 en §2 */}
+      {/* TODO(politie-meter): afbreken van het gevecht op basis van de politie-meter — zie design §2 */}
 
-      <p>
-        <em>Placeholder — de gevecht-simulatie zelf wordt in een later issue gebouwd.</em>
-      </p>
+      {phaseState === "not-started" && (
+        <button type="button" onClick={handleStart}>
+          Start gevecht
+        </button>
+      )}
+
+      {phaseState !== "not-started" && (
+        <FightCanvas key={fightKey} playerRoster={roster} onFinish={handleFinish} />
+      )}
+
+      {phaseState === "finished" && result && (
+        <FightResultScreen result={result} onRestart={handleStart} />
+      )}
     </section>
   );
 }
