@@ -1,6 +1,7 @@
 "use client";
 
 import { useGameStore } from "@/lib/store/use-game-store";
+import { RecruitmentPanel } from "@/components/recruitment/recruitment-panel";
 
 export function VoorbereidingPhase() {
   const gang = useGameStore((state) => state.gang);
@@ -15,15 +16,13 @@ export function VoorbereidingPhase() {
         <dd>{gang.roster.length} hooligans</dd>
       </dl>
 
-      {/* TODO(recruitment): interview-systeem (locaties, vragen, trait-signalen) — zie design §6 */}
+      <RecruitmentPanel />
+
       {/* TODO(aankopen): bouwmarkt/dark web-inkopen en uitrusting toewijzen aan hooligans — zie design §4 */}
       {/* TODO(gokken): inzet op de wedstrijd van de eigen club — zie design §5 */}
 
       <p>
-        <em>
-          Placeholder — recruitment, aankopen/uitrusting en gok-inzet worden in
-          latere issues toegevoegd.
-        </em>
+        <em>Placeholder — aankopen/uitrusting en gok-inzet worden in latere issues toegevoegd.</em>
       </p>
     </section>
   );
