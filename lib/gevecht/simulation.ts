@@ -1,8 +1,11 @@
 import type { Hooligan } from "@/types";
+import { determineArrestOutcome } from "./arrest";
 import {
   BASE_DAMAGE_PER_SECOND,
   BASE_HEALTH,
   BASE_SPEED,
+  BETRAYAL_POLICE_GAUGE_START_BONUS_PERCENT,
+  BIVAKMUTS_POLICE_TOLERANCE_SECONDS,
   COCAINE_SPEED_MULTIPLIER,
   CONTACT_RANGE,
   DRONKEN_DAMAGE_MULTIPLIER,
@@ -13,12 +16,16 @@ import {
   FLEE_CHANCE_ON_LETHAL_HIT,
   HATE_DAMAGE_BONUS_PER_POINT,
   MAX_FIGHT_DURATION_SECONDS,
+  MAX_POLICE_GAUGE_START_PERCENT,
+  POLICE_GAUGE_MAX_PERCENT_PER_SECOND,
+  POLICE_GAUGE_PERCENT_PER_SECOND_PER_NOTORIETY,
   VECHTSPORT_DAMAGE_MULTIPLIER,
 } from "./constants";
 import { equipmentDamageMultiplier } from "./equipment-modifiers";
 import { generateOpponentTeam, padRosterForFight } from "./generate-team";
 import {
   computeHateScore,
+  heeftBivakmuts,
   heeftCocaine,
   heeftVechtsportTrait,
   isDronken,
@@ -27,6 +34,7 @@ import type {
   Combatant,
   Duel,
   FightConfig,
+  FightOutcome,
   FightResult,
   FightState,
   TeamId,
@@ -37,6 +45,8 @@ export const DEFAULT_FIGHT_CONFIG: FightConfig = {
   fieldWidth: FIELD_WIDTH,
   fieldHeight: FIELD_HEIGHT,
   maxDurationSeconds: MAX_FIGHT_DURATION_SECONDS,
+  notoriety: 0,
+  startingPoliceGaugePercent: 0,
 };
 
 const SPAWN_MARGIN = 60;
@@ -49,11 +59,19 @@ function randomTeamSize(): number {
   return 5 + Math.floor(Math.random() * 4); // 5 t/m 8
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
 function computeSpeed(hooligan: Hooligan): number {
   let speed = BASE_SPEED;
   if (heeftCocaine(hooligan)) speed *= COCAINE_SPEED_MULTIPLIER;
   if (isDronken(hooligan)) speed *= DRONKEN_SPEED_MULTIPLIER;
   return speed;
+}
+
+function computePoliceTolerance(hooligan: Hooligan): number {
+  return heeftBivakmuts(hooligan) ? BIVAKMUTS_POLICE_TOLERANCE_SECONDS : 0;
 }
 
 function createCombatant(
@@ -72,6 +90,7 @@ function createCombatant(
     speed: computeSpeed(hooligan),
     targetId: null,
     duelId: null,
+    policeToleranceSeconds: computePoliceTolerance(hooligan),
   };
 }
 
@@ -96,6 +115,7 @@ export function createFight(
   const teamSize = randomTeamSize();
   const playerHooligans = padRosterForFight(playerRoster, teamSize, teamSize);
   const opponentHooligans = generateOpponentTeam(teamSize);
+  const startingPoliceGaugePercent = clamp(config.startingPoliceGaugePercent, 0, 100);
 
   return {
     config,
@@ -107,6 +127,8 @@ export function createFight(
     duels: [],
     status: "in-progress",
     result: null,
+    policeGaugePercent: startingPoliceGaugePercent,
+    policeGaugeFullAtSeconds: startingPoliceGaugePercent >= 100 ? 0 : null,
   };
 }
 
@@ -156,10 +178,6 @@ function assignTargets(combatants: Combatant[]): void {
 
 function distance(a: Vector2, b: Vector2): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
 
 /** Beweegt hooligans die nog geen contact hebben richting hun doelwit (of diens kluitje). */
@@ -339,10 +357,49 @@ function isStillFighting(combatant: Combatant): boolean {
   );
 }
 
+/** Hoeveel procentpunt de politie-meter per seconde stijgt, puur op basis van beruchtheid (design §2). */
+function policeGaugeFillRatePerSecond(notoriety: number): number {
+  return clamp(
+    notoriety * POLICE_GAUGE_PERCENT_PER_SECOND_PER_NOTORIETY,
+    0,
+    POLICE_GAUGE_MAX_PERCENT_PER_SECOND,
+  );
+}
+
+/**
+ * Zodra de meter vol is, vluchten "verstandige" hooligans (niet dronken, niet neergeslagen) het
+ * veld af — met een extra tolerantie voor wie een bivakmuts draagt. Dronken/KO'de hooligans
+ * blijven staan/liggen en worden later door de politie opgepakt.
+ */
+function triggerPoliceFlee(
+  combatants: Combatant[],
+  elapsedSeconds: number,
+  policeGaugeFullAtSeconds: number | null,
+): void {
+  if (policeGaugeFullAtSeconds === null) return;
+
+  for (const combatant of combatants) {
+    if (
+      combatant.state !== "idle" &&
+      combatant.state !== "moving" &&
+      combatant.state !== "fighting"
+    ) {
+      continue;
+    }
+    if (isDronken(combatant.hooligan)) continue;
+    if (elapsedSeconds - policeGaugeFullAtSeconds < combatant.policeToleranceSeconds) continue;
+
+    combatant.state = "fleeing";
+    combatant.duelId = null;
+    combatant.targetId = null;
+  }
+}
+
 function evaluateFightEnd(
   combatants: Combatant[],
   elapsedSeconds: number,
   config: FightConfig,
+  policeGaugeFullAtSeconds: number | null,
 ): FightResult | null {
   const playerRemaining = combatants.some(
     (c) => c.team === "player" && isStillFighting(c),
@@ -350,9 +407,13 @@ function evaluateFightEnd(
   const opponentRemaining = combatants.some(
     (c) => c.team === "opponent" && isStillFighting(c),
   );
+  const policeSweepResolved =
+    policeGaugeFullAtSeconds !== null &&
+    !combatants.some((c) => c.state === "fleeing");
 
-  let outcome: FightResult["outcome"] | null = null;
+  let outcome: FightOutcome | null = null;
   if (!opponentRemaining) outcome = "full-clear-player";
+  else if (policeSweepResolved) outcome = "police-raid";
   else if (!playerRemaining) outcome = "full-clear-opponent";
   else if (elapsedSeconds >= config.maxDurationSeconds) outcome = "timeout";
 
@@ -365,7 +426,22 @@ function evaluateFightEnd(
     if (combatant.state === "fled") fledCounts[combatant.team] += 1;
   }
 
-  return { outcome, koCounts, fledCounts };
+  // Bij een full clear was er geen politie-inmenging nodig; niemand wordt opgepakt.
+  const isPoliceSweep = outcome === "police-raid" || outcome === "timeout";
+  const arrests = isPoliceSweep
+    ? combatants
+        .filter((c) => c.team === "player" && c.state !== "fled")
+        .map((c) => determineArrestOutcome(c.hooligan))
+    : [];
+
+  const betrayalCount = arrests.filter((arrest) => arrest.betrayal).length;
+  const nextPoliceGaugeStartPercent = clamp(
+    betrayalCount * BETRAYAL_POLICE_GAUGE_START_BONUS_PERCENT,
+    0,
+    MAX_POLICE_GAUGE_START_PERCENT,
+  );
+
+  return { outcome, koCounts, fledCounts, arrests, nextPoliceGaugeStartPercent };
 }
 
 /** Berekent een volledige tick van de gevecht-simulatie. Pure functie: retourneert nieuwe state. */
@@ -379,14 +455,25 @@ export function stepFight(state: FightState, dtSeconds: number): FightState {
   }));
   const elapsedSeconds = state.elapsedSeconds + dtSeconds;
 
+  const fillRate = policeGaugeFillRatePerSecond(state.config.notoriety);
+  const policeGaugePercent = clamp(state.policeGaugePercent + fillRate * dtSeconds, 0, 100);
+  const policeGaugeFullAtSeconds =
+    state.policeGaugeFullAtSeconds ?? (policeGaugePercent >= 100 ? elapsedSeconds : null);
+
   assignTargets(combatants);
   moveCombatants(combatants, duels, dtSeconds, state.config);
   resolveContacts(combatants, duels);
   resolveDamage(combatants, duels, dtSeconds);
+  triggerPoliceFlee(combatants, elapsedSeconds, policeGaugeFullAtSeconds);
   const remainingDuels = cleanupDuels(combatants, duels);
   updateFleeing(combatants, dtSeconds, state.config);
 
-  const result = evaluateFightEnd(combatants, elapsedSeconds, state.config);
+  const result = evaluateFightEnd(
+    combatants,
+    elapsedSeconds,
+    state.config,
+    policeGaugeFullAtSeconds,
+  );
 
   return {
     ...state,
@@ -395,5 +482,7 @@ export function stepFight(state: FightState, dtSeconds: number): FightState {
     duels: remainingDuels,
     status: result ? "finished" : "in-progress",
     result,
+    policeGaugePercent,
+    policeGaugeFullAtSeconds,
   };
 }

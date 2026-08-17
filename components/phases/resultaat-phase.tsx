@@ -16,13 +16,13 @@ export function ResultaatPhase() {
       </dl>
 
       {/* TODO(beruchtheid): bijwerken op basis van de gevecht-uitkomst (afgebroken vs. full clear) — zie design §1 */}
-      {/* TODO(arrestaties): verwerken via de trait-tabel (tijdelijk/permanent verlies, verraad) — zie design §3 */}
       {/* TODO(economie): inkomsten bijschrijven (bijbaantje/kantoorbaan) — zie design §4 */}
 
       <p>
         <em>
-          Placeholder — beruchtheid-update, arrestaties en inkomsten worden in
-          latere issues toegevoegd.
+          Placeholder — beruchtheid-update en inkomsten worden in latere issues
+          toegevoegd. Arrestaties (tijdelijk/permanent verlies, verraad) worden al
+          direct na het gevecht in het roster verwerkt.
         </em>
       </p>
     </section>
