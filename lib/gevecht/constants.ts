@@ -66,3 +66,10 @@ export const BETRAYAL_POLICE_GAUGE_START_BONUS_PERCENT = 15;
 
 /** Bovengrens voor de politie-meter-startwaarde die door verraad kan worden opgebouwd. */
 export const MAX_POLICE_GAUGE_START_PERCENT = 60;
+
+/**
+ * Politie-meter-startwaarde na daadwerkelijk vuurwapengebruik in een gevecht: bijna gegarandeerde
+ * massa-arrestatie volgende week — de "nucleaire optie" (design §4). Overstijgt bewust
+ * `MAX_POLICE_GAUGE_START_PERCENT`, die alleen voor verraad geldt.
+ */
+export const FIREARM_POLICE_GAUGE_START_PERCENT = 90;

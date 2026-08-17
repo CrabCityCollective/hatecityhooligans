@@ -39,3 +39,16 @@ export function heeftVechtsportTrait(hooligan: Hooligan): boolean {
 export function heeftBivakmuts(hooligan: Hooligan): boolean {
   return hooligan.equipment.some((item) => item.id === "bivakmuts");
 }
+
+export function heeftVuurwapen(hooligan: Hooligan): boolean {
+  return hooligan.equipment.some((item) => item.id === "vuurwapen");
+}
+
+/**
+ * Kantoorbaan-hooligans genereren hoog inkomen (zie lib/economy/constants.ts) maar zouden als
+ * eerste moeten vluchten zodra de politie-meter oploopt (design §4) — nog niet verwerkt in de
+ * vlucht-logica, zie de TODO bij `triggerPoliceFlee` in simulation.ts.
+ */
+export function heeftKantoorbaanTrait(hooligan: Hooligan): boolean {
+  return hooligan.traits.background.includes("kantoorbaan");
+}
