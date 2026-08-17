@@ -69,4 +69,10 @@ export interface Hooligan {
   equipment: Equipment[];
   /** Alleen relevant als status === "unavailable". */
   unavailableUntilWeek?: number;
+  /**
+   * True als deze hooligan bij recruitment als undercover agent is aangenomen (kans stijgt met
+   * beruchtheid, zie design §6). De gameplay-consequentie (verraad tijdens gevecht) is een TODO
+   * voor een later issue — dit issue slaat alleen de flag op.
+   */
+  isUndercoverAgent?: boolean;
 }

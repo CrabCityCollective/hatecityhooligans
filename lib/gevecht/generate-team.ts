@@ -5,7 +5,7 @@ import type {
   SubstancePreference,
 } from "@/types";
 
-const FIRST_NAMES = [
+export const FIRST_NAMES = [
   "Kevin",
   "Dennis",
   "Ricardo",
@@ -24,7 +24,7 @@ const FIRST_NAMES = [
   "Melvin",
 ];
 
-const LAST_NAME_INITIALS = "BCDFGHJKLMNPRSTVW".split("");
+export const LAST_NAME_INITIALS = "BCDFGHJKLMNPRSTVW".split("");
 
 const BACKGROUND_TRAITS: BackgroundTrait[] = [
   "kickboksen",
@@ -60,15 +60,15 @@ const VISIBLE_TRAITS: Exclude<HateTrigger, "rivaliserende-club">[] = [
   "huisdieren",
 ];
 
-function pickOne<T>(items: T[]): T {
+export function pickOne<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-function pickSome<T>(items: T[], chance: number): T[] {
+export function pickSome<T>(items: T[], chance: number): T[] {
   return items.filter(() => Math.random() < chance);
 }
 
-function createId(prefix: string): string {
+export function createId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
