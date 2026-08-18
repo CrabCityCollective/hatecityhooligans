@@ -13,6 +13,7 @@ import {
   DRONKEN_SPEED_MULTIPLIER,
   FIELD_HEIGHT,
   FIELD_WIDTH,
+  FIREARM_POLICE_GAUGE_START_PERCENT,
   FLEE_CHANCE_ON_LETHAL_HIT,
   HATE_DAMAGE_BONUS_PER_POINT,
   MAX_FIGHT_DURATION_SECONDS,
@@ -28,6 +29,7 @@ import {
   heeftBivakmuts,
   heeftCocaine,
   heeftVechtsportTrait,
+  heeftVuurwapen,
   isDronken,
 } from "./hooligan-traits";
 import type {
@@ -129,6 +131,7 @@ export function createFight(
     result: null,
     policeGaugePercent: startingPoliceGaugePercent,
     policeGaugeFullAtSeconds: startingPoliceGaugePercent >= 100 ? 0 : null,
+    firearmUsedByPlayer: false,
   };
 }
 
@@ -370,6 +373,12 @@ function policeGaugeFillRatePerSecond(notoriety: number): number {
  * Zodra de meter vol is, vluchten "verstandige" hooligans (niet dronken, niet neergeslagen) het
  * veld af — met een extra tolerantie voor wie een bivakmuts draagt. Dronken/KO'de hooligans
  * blijven staan/liggen en worden later door de politie opgepakt.
+ *
+ * TODO(economie): kantoorbaan-hooligans (hoog inkomen, zie lib/economy/constants.ts) zouden als
+ * eerste moeten vluchten zodra de meter oploopt, vóór iedereen anders (design §4). Nog niet
+ * geïmplementeerd — hook: `heeftKantoorbaanTrait` in ./hooligan-traits.ts. Vermoedelijke aanpak:
+ * een eigen (negatieve) `policeToleranceSeconds`-behandeling of aparte vlucht-trigger die niet op
+ * `policeGaugeFullAtSeconds` wacht.
  */
 function triggerPoliceFlee(
   combatants: Combatant[],
@@ -400,6 +409,7 @@ function evaluateFightEnd(
   elapsedSeconds: number,
   config: FightConfig,
   policeGaugeFullAtSeconds: number | null,
+  firearmUsedByPlayer: boolean,
 ): FightResult | null {
   const playerRemaining = combatants.some(
     (c) => c.team === "player" && isStillFighting(c),
@@ -435,13 +445,24 @@ function evaluateFightEnd(
     : [];
 
   const betrayalCount = arrests.filter((arrest) => arrest.betrayal).length;
-  const nextPoliceGaugeStartPercent = clamp(
+  const betrayalStartPercent = clamp(
     betrayalCount * BETRAYAL_POLICE_GAUGE_START_BONUS_PERCENT,
     0,
     MAX_POLICE_GAUGE_START_PERCENT,
   );
+  // Vuurwapengebruik overstemt verraad-opbouw: "bijna gegarandeerde massa-arrestatie" (design §4).
+  const nextPoliceGaugeStartPercent = firearmUsedByPlayer
+    ? clamp(Math.max(betrayalStartPercent, FIREARM_POLICE_GAUGE_START_PERCENT), 0, 100)
+    : betrayalStartPercent;
 
-  return { outcome, koCounts, fledCounts, arrests, nextPoliceGaugeStartPercent };
+  return {
+    outcome,
+    koCounts,
+    fledCounts,
+    arrests,
+    nextPoliceGaugeStartPercent,
+    firearmUsedByPlayer,
+  };
 }
 
 /** Berekent een volledige tick van de gevecht-simulatie. Pure functie: retourneert nieuwe state. */
@@ -468,11 +489,21 @@ export function stepFight(state: FightState, dtSeconds: number): FightState {
   const remainingDuels = cleanupDuels(combatants, duels);
   updateFleeing(combatants, dtSeconds, state.config);
 
+  const firearmUsedByPlayer =
+    state.firearmUsedByPlayer ||
+    combatants.some(
+      (combatant) =>
+        combatant.team === "player" &&
+        combatant.state === "fighting" &&
+        heeftVuurwapen(combatant.hooligan),
+    );
+
   const result = evaluateFightEnd(
     combatants,
     elapsedSeconds,
     state.config,
     policeGaugeFullAtSeconds,
+    firearmUsedByPlayer,
   );
 
   return {
@@ -484,5 +515,6 @@ export function stepFight(state: FightState, dtSeconds: number): FightState {
     result,
     policeGaugePercent,
     policeGaugeFullAtSeconds,
+    firearmUsedByPlayer,
   };
 }

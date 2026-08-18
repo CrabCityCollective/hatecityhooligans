@@ -55,6 +55,8 @@ export type EquipmentId =
   | "vuurwapen";
 
 export interface Equipment {
+  /** Unieke instantie-id: elke aankoop is een eigen exemplaar, ook van hetzelfde item-type. */
+  instanceId: string;
   id: EquipmentId;
   name: string;
   /** Verbruikt na gebruik (bv. pepperspray) vs. permanent bezit (bv. bivakmuts). */

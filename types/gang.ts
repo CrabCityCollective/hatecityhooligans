@@ -1,4 +1,4 @@
-import type { Hooligan } from "./hooligan";
+import type { Equipment, Hooligan } from "./hooligan";
 
 export interface Gang {
   id: string;
@@ -10,4 +10,6 @@ export interface Gang {
   notoriety: number;
   /** Eigen club, voor het voetbal-gok-systeem (zie design §5). */
   favoriteClub: string;
+  /** Gekochte maar nog niet aan een hooligan toegewezen uitrusting (zie design §4). */
+  inventory: Equipment[];
 }

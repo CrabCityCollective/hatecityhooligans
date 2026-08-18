@@ -28,6 +28,14 @@ export function FightResultScreen({ result, onRestart }: FightResultScreenProps)
   return (
     <section aria-label="Gevecht-resultaat">
       <h2>{OUTCOME_LABELS[result.outcome]}</h2>
+
+      {result.firearmUsedByPlayer && (
+        <p role="alert">
+          ⚠ Vuurwapen gebruikt — de politie-meter start volgende week drastisch hoger. Bijna
+          gegarandeerde massa-arrestatie.
+        </p>
+      )}
+
       <table>
         <thead>
           <tr>

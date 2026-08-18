@@ -70,8 +70,13 @@ export interface FightResult {
   fledCounts: Record<TeamId, number>;
   /** Opgepakte hooligans uit de eigen gang, met hun trait-gebaseerde uitkomst (design §3). */
   arrests: HooliganArrestResult[];
-  /** Politie-meter-startwaarde voor het volgende gevecht (hoger bij verraad). */
+  /** Politie-meter-startwaarde voor het volgende gevecht (hoger bij verraad of vuurwapengebruik). */
   nextPoliceGaugeStartPercent: number;
+  /**
+   * True als een hooligan van de eigen gang daadwerkelijk met een vuurwapen gevochten heeft
+   * (design §4) — verhoogt `nextPoliceGaugeStartPercent` drastisch.
+   */
+  firearmUsedByPlayer: boolean;
 }
 
 export interface FightConfig {
@@ -94,4 +99,6 @@ export interface FightState {
   policeGaugePercent: number;
   /** `elapsedSeconds` waarop de meter voor het eerst vol was, of null zolang dat nog niet zo is. */
   policeGaugeFullAtSeconds: number | null;
+  /** True zodra een hooligan van de eigen gang met een vuurwapen gevochten heeft (design §4). */
+  firearmUsedByPlayer: boolean;
 }
