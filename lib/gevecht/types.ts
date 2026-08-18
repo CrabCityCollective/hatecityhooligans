@@ -87,6 +87,12 @@ export interface FightConfig {
   notoriety: number;
   /** Startwaarde van de politie-meter bij het begin van dit gevecht (bv. door verraad vorige week). */
   startingPoliceGaugePercent: number;
+  /**
+   * Tijdelijke haat/agressie-boost voor de eigen hooligans, actief na een verlies van de eigen
+   * club bij het voetbal-gok-systeem (design §5). Verhoogt schade en haat-score, geldt alleen voor
+   * dit ene gevecht.
+   */
+  playerAggressionBoostActive: boolean;
 }
 
 export interface FightState {

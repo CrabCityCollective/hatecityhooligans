@@ -73,3 +73,12 @@ export const MAX_POLICE_GAUGE_START_PERCENT = 60;
  * `MAX_POLICE_GAUGE_START_PERCENT`, die alleen voor verraad geldt.
  */
 export const FIREARM_POLICE_GAUGE_START_PERCENT = 90;
+
+/**
+ * Extra haat-score voor eigen hooligans tijdens een gevecht na een verlies van de eigen club
+ * (design §5). Telt mee in zowel de targeting-score als de haat-schade-bonus.
+ */
+export const AGGRESSION_BOOST_HATE_SCORE_BONUS = 4;
+
+/** Directe schade-vermenigvuldiger voor eigen hooligans tijdens de agressie-boost (design §5). */
+export const AGGRESSION_BOOST_DAMAGE_MULTIPLIER = 1.2;
