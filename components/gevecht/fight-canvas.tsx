@@ -14,6 +14,8 @@ interface FightCanvasProps {
   startingPoliceGaugePercent: number;
   /** Tijdelijke haat/agressie-boost na een verlies van de eigen club (design §5). */
   playerAggressionBoostActive: boolean;
+  /** True als de tegenstander deze week een vastgelegde rivaal is van de eigen club (design §9). */
+  isRivalMatch: boolean;
   onFinish: (result: FightResult) => void;
 }
 
@@ -25,6 +27,7 @@ export function FightCanvas({
   notoriety,
   startingPoliceGaugePercent,
   playerAggressionBoostActive,
+  isRivalMatch,
   onFinish,
 }: FightCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -35,6 +38,7 @@ export function FightCanvas({
       notoriety,
       startingPoliceGaugePercent,
       playerAggressionBoostActive,
+      isRivalMatch,
     });
   }
   const initialFight = initialFightRef.current;
