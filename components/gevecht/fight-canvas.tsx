@@ -12,6 +12,8 @@ interface FightCanvasProps {
   notoriety: number;
   /** Startwaarde van de politie-meter, bv. verhoogd door verraad bij een vorige arrestatie. */
   startingPoliceGaugePercent: number;
+  /** Tijdelijke haat/agressie-boost na een verlies van de eigen club (design §5). */
+  playerAggressionBoostActive: boolean;
   onFinish: (result: FightResult) => void;
 }
 
@@ -22,6 +24,7 @@ export function FightCanvas({
   playerRoster,
   notoriety,
   startingPoliceGaugePercent,
+  playerAggressionBoostActive,
   onFinish,
 }: FightCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,6 +34,7 @@ export function FightCanvas({
       ...DEFAULT_FIGHT_CONFIG,
       notoriety,
       startingPoliceGaugePercent,
+      playerAggressionBoostActive,
     });
   }
   const initialFight = initialFightRef.current;

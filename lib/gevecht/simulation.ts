@@ -1,6 +1,8 @@
 import type { Hooligan } from "@/types";
 import { determineArrestOutcome } from "./arrest";
 import {
+  AGGRESSION_BOOST_DAMAGE_MULTIPLIER,
+  AGGRESSION_BOOST_HATE_SCORE_BONUS,
   BASE_DAMAGE_PER_SECOND,
   BASE_HEALTH,
   BASE_SPEED,
@@ -49,6 +51,7 @@ export const DEFAULT_FIGHT_CONFIG: FightConfig = {
   maxDurationSeconds: MAX_FIGHT_DURATION_SECONDS,
   notoriety: 0,
   startingPoliceGaugePercent: 0,
+  playerAggressionBoostActive: false,
 };
 
 const SPAWN_MARGIN = 60;
@@ -148,8 +151,19 @@ function findById(combatants: Combatant[], id: string | null): Combatant | undef
   return combatants.find((combatant) => combatant.id === id);
 }
 
+/** True als deze aanvaller-team op dit moment de gok-verlies-agressieboost geniet (design §5). */
+function isAggressionBoosted(team: TeamId, config: FightConfig): boolean {
+  return config.playerAggressionBoostActive && team === "player";
+}
+
+/** Haat-score, verhoogd met de agressieboost-bonus als die voor deze aanvaller actief is. */
+function effectiveHateScore(attacker: Hooligan, defender: Hooligan, boosted: boolean): number {
+  const score = computeHateScore(attacker, defender);
+  return boosted ? score + AGGRESSION_BOOST_HATE_SCORE_BONUS : score;
+}
+
 /** Elke vrije hooligan zoekt (opnieuw) het hoogst scorende, nog levende/actieve doelwit. */
-function assignTargets(combatants: Combatant[]): void {
+function assignTargets(combatants: Combatant[], config: FightConfig): void {
   for (const combatant of combatants) {
     if (combatant.state !== "idle" && combatant.state !== "moving") continue;
 
@@ -164,10 +178,11 @@ function assignTargets(combatants: Combatant[]): void {
       continue;
     }
 
+    const boosted = isAggressionBoosted(combatant.team, config);
     let bestTarget = enemies[0];
-    let bestScore = computeHateScore(combatant.hooligan, bestTarget.hooligan);
+    let bestScore = effectiveHateScore(combatant.hooligan, bestTarget.hooligan, boosted);
     for (const enemy of enemies.slice(1)) {
-      const score = computeHateScore(combatant.hooligan, enemy.hooligan);
+      const score = effectiveHateScore(combatant.hooligan, enemy.hooligan, boosted);
       if (score > bestScore) {
         bestTarget = enemy;
         bestScore = score;
@@ -249,11 +264,17 @@ function resolveContacts(combatants: Combatant[], duels: Duel[]): void {
   }
 }
 
-function computeDamage(attacker: Hooligan, defender: Hooligan, dtSeconds: number): number {
+function computeDamage(
+  attacker: Hooligan,
+  defender: Hooligan,
+  dtSeconds: number,
+  boosted: boolean,
+): number {
   let dps = BASE_DAMAGE_PER_SECOND;
   dps *= heeftVechtsportTrait(attacker) ? VECHTSPORT_DAMAGE_MULTIPLIER : 1;
   dps *= equipmentDamageMultiplier(attacker.equipment);
-  dps *= 1 + computeHateScore(attacker, defender) * HATE_DAMAGE_BONUS_PER_POINT;
+  dps *= 1 + effectiveHateScore(attacker, defender, boosted) * HATE_DAMAGE_BONUS_PER_POINT;
+  dps *= boosted ? AGGRESSION_BOOST_DAMAGE_MULTIPLIER : 1;
 
   if (isDronken(attacker)) {
     if (Math.random() < DRONKEN_MISS_CHANCE) return 0;
@@ -280,7 +301,12 @@ function handleLethalHit(combatant: Combatant): void {
  * Past schade toe binnen elk kluitje: elke aanvaller richt op de zwakste levende tegenstander in
  * het kluitje. Bij 2-tegen-1 (of meer) tellen alle aanvallers gewoon op tegen dezelfde underdog.
  */
-function resolveDamage(combatants: Combatant[], duels: Duel[], dtSeconds: number): void {
+function resolveDamage(
+  combatants: Combatant[],
+  duels: Duel[],
+  dtSeconds: number,
+  config: FightConfig,
+): void {
   for (const duel of duels) {
     const participants = duel.participantIds
       .map((id) => findById(combatants, id))
@@ -291,11 +317,12 @@ function resolveDamage(combatants: Combatant[], duels: Duel[], dtSeconds: number
       const defenders = participants.filter((c) => c.team !== team);
       if (attackers.length === 0 || defenders.length === 0) continue;
 
+      const boosted = isAggressionBoosted(team, config);
       for (const attacker of attackers) {
         const focus = defenders.reduce((weakest, current) =>
           current.health < weakest.health ? current : weakest,
         );
-        const damage = computeDamage(attacker.hooligan, focus.hooligan, dtSeconds);
+        const damage = computeDamage(attacker.hooligan, focus.hooligan, dtSeconds, boosted);
         focus.health -= damage;
         if (focus.health <= 0 && focus.state === "fighting") {
           handleLethalHit(focus);
@@ -481,10 +508,10 @@ export function stepFight(state: FightState, dtSeconds: number): FightState {
   const policeGaugeFullAtSeconds =
     state.policeGaugeFullAtSeconds ?? (policeGaugePercent >= 100 ? elapsedSeconds : null);
 
-  assignTargets(combatants);
+  assignTargets(combatants, state.config);
   moveCombatants(combatants, duels, dtSeconds, state.config);
   resolveContacts(combatants, duels);
-  resolveDamage(combatants, duels, dtSeconds);
+  resolveDamage(combatants, duels, dtSeconds, state.config);
   triggerPoliceFlee(combatants, elapsedSeconds, policeGaugeFullAtSeconds);
   const remainingDuels = cleanupDuels(combatants, duels);
   updateFleeing(combatants, dtSeconds, state.config);

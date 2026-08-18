@@ -12,6 +12,11 @@ import {
   type DarkWebPurchaseResult,
 } from "@/lib/economy/purchase";
 import { getShopItem } from "@/lib/economy/shop-items";
+import { BASE_FORM } from "@/lib/gok/constants";
+import { generateMatch, resolveMatch } from "@/lib/gok/match";
+import type { Bet, FootballMatch, MatchOutcome, MatchResult } from "@/lib/gok/types";
+
+const FALLBACK_CLUB_NAME = "Eigen club";
 
 const INITIAL_STATE: GameState = {
   currentWeek: 1,
@@ -60,6 +65,27 @@ interface GameStore extends GameState {
    * start daardoor al drastisch verhoogd (zie `policeGaugePercent`). Puur informatief (design §4).
    */
   firearmAlertActive: boolean;
+  /** Wedstrijd van de eigen club deze week, met vorm-gebaseerde odds (design §5). */
+  currentMatch: FootballMatch;
+  /** Vorm-waarde van de laatst gespeelde wedstrijd, als basis voor lichte fluctuatie volgende week. */
+  previousClubForm: number;
+  /** Geplaatste weddenschap op `currentMatch`, of null zolang er nog niet is ingezet. */
+  currentBet: Bet | null;
+  /** Uitslag + uitbetaling van `currentMatch`, of null zolang die nog niet is afgespeeld. */
+  matchResult: MatchResult | null;
+  /**
+   * Tijdelijke haat/agressie-boost voor het eigen roster tijdens het komende gevecht: actief na
+   * een verlies van de eigen club, verdwijnt weer na dat ene gevecht (design §5).
+   */
+  playerAggressionBoostActive: boolean;
+
+  /** Plaatst een weddenschap op `currentMatch` en schrijft de inzet direct af (design §5). */
+  placeBet: (outcome: MatchOutcome, amount: number) => void;
+  /**
+   * Speelt `currentMatch` af: bepaalt de uitslag, verwerkt een eventuele weddenschap (uitbetaling
+   * of verlies van de inzet) en zet de agressie-boost voor het komende gevecht bij een verlies.
+   */
+  playMatch: () => void;
 
   advanceWeek: () => void;
   /**
@@ -95,6 +121,32 @@ export const useGameStore = create<GameStore>((set) => ({
   lastWeekIncome: null,
   lastConsumableBreakage: [],
   firearmAlertActive: false,
+  currentMatch: generateMatch(1, INITIAL_STATE.gang.favoriteClub || FALLBACK_CLUB_NAME),
+  previousClubForm: BASE_FORM,
+  currentBet: null,
+  matchResult: null,
+  playerAggressionBoostActive: false,
+  placeBet: (outcome, amount) =>
+    set((state) => {
+      if (state.currentBet || state.matchResult) return state;
+      if (amount <= 0 || amount > state.gang.money) return state;
+
+      return {
+        gang: { ...state.gang, money: state.gang.money - amount },
+        currentBet: { outcome, amount },
+      };
+    }),
+  playMatch: () =>
+    set((state) => {
+      if (state.matchResult) return state;
+
+      const result = resolveMatch(state.currentMatch, state.currentBet);
+      return {
+        matchResult: result,
+        gang: { ...state.gang, money: state.gang.money + result.payout },
+        playerAggressionBoostActive: result.outcome === "verlies",
+      };
+    }),
   advanceWeek: () =>
     set((state) => ({ currentWeek: state.currentWeek + 1 })),
   advancePhase: () =>
@@ -104,11 +156,23 @@ export const useGameStore = create<GameStore>((set) => ({
 
       if (isLastPhase) {
         const income = computeWeeklyIncome(state.gang.roster);
+        const nextWeek = state.currentWeek + 1;
+        const nextForm = state.currentMatch.form;
+
         return {
           currentPhase: PHASE_ORDER[0],
-          currentWeek: state.currentWeek + 1,
+          currentWeek: nextWeek,
           gang: { ...state.gang, money: state.gang.money + income.total },
           lastWeekIncome: income,
+          currentMatch: generateMatch(
+            nextWeek,
+            state.gang.favoriteClub || FALLBACK_CLUB_NAME,
+            nextForm,
+          ),
+          previousClubForm: nextForm,
+          currentBet: null,
+          matchResult: null,
+          playerAggressionBoostActive: false,
         };
       }
 
@@ -140,6 +204,8 @@ export const useGameStore = create<GameStore>((set) => ({
         policeGaugePercent: result.nextPoliceGaugeStartPercent,
         firearmAlertActive: result.firearmUsedByPlayer,
         lastConsumableBreakage: broken,
+        // De agressie-boost geldt maar voor dit ene gevecht (design §5).
+        playerAggressionBoostActive: false,
       };
     }),
   buyBouwmarktItem: (itemId) =>

@@ -4,6 +4,7 @@ import { useGameStore } from "@/lib/store/use-game-store";
 import { RecruitmentPanel } from "@/components/recruitment/recruitment-panel";
 import { ShopPanel } from "@/components/economy/shop-panel";
 import { EquipmentPanel } from "@/components/economy/equipment-panel";
+import { MatchBettingPanel } from "@/components/gok/match-betting-panel";
 
 export function VoorbereidingPhase() {
   const gang = useGameStore((state) => state.gang);
@@ -48,11 +49,7 @@ export function VoorbereidingPhase() {
       <ShopPanel />
       <EquipmentPanel />
 
-      {/* TODO(gokken): inzet op de wedstrijd van de eigen club — zie design §5 */}
-
-      <p>
-        <em>Placeholder — gok-inzet wordt in een latere issue toegevoegd.</em>
-      </p>
+      <MatchBettingPanel />
     </section>
   );
 }

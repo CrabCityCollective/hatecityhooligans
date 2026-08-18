@@ -12,6 +12,7 @@ export function GevechtPhase() {
   const roster = useGameStore((state) => state.gang.roster);
   const notoriety = useGameStore((state) => state.gang.notoriety);
   const policeGaugePercent = useGameStore((state) => state.policeGaugePercent);
+  const playerAggressionBoostActive = useGameStore((state) => state.playerAggressionBoostActive);
   const applyFightResult = useGameStore((state) => state.applyFightResult);
   const [phaseState, setPhaseState] = useState<FightPhaseState>("not-started");
   const [result, setResult] = useState<FightResult | null>(null);
@@ -33,6 +34,13 @@ export function GevechtPhase() {
     <section>
       <h1>Gevecht</h1>
 
+      {playerAggressionBoostActive && (
+        <p role="alert">
+          🔥 Agressie-boost actief: de eigen club verloor, het roster vecht met verhoogde haat en
+          schade tijdens dit gevecht.
+        </p>
+      )}
+
       {phaseState === "not-started" && (
         <button type="button" onClick={handleStart}>
           Start gevecht
@@ -45,6 +53,7 @@ export function GevechtPhase() {
           playerRoster={roster}
           notoriety={notoriety}
           startingPoliceGaugePercent={policeGaugePercent}
+          playerAggressionBoostActive={playerAggressionBoostActive}
           onFinish={handleFinish}
         />
       )}
