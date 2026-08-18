@@ -20,6 +20,8 @@ export function GangOverview() {
         <dd>{PHASE_LABELS[currentPhase]}</dd>
         <dt>Divisie</dt>
         <dd>{division}</dd>
+        <dt>Eigen club</dt>
+        <dd>{gang.favoriteClub}</dd>
         <dt>Politie-meter</dt>
         <dd>{policeGaugePercent}%</dd>
         <dt>Geld</dt>

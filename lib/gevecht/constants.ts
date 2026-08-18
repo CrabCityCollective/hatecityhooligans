@@ -82,3 +82,9 @@ export const AGGRESSION_BOOST_HATE_SCORE_BONUS = 4;
 
 /** Directe schade-vermenigvuldiger voor eigen hooligans tijdens de agressie-boost (design §5). */
 export const AGGRESSION_BOOST_DAMAGE_MULTIPLIER = 1.2;
+
+/**
+ * Extra haat-score voor eigen hooligans als de tegenstander deze week een vastgelegde rivaal is
+ * van de eigen club (design §9, MVP 8). Telt mee in zowel targeting als de haat-schade-bonus.
+ */
+export const RIVAL_MATCH_HATE_SCORE_BONUS = 3;

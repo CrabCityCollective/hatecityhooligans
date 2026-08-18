@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { EquipmentId, GameState, Hooligan } from "@/types";
+import type { Division, EquipmentId, GameState, Hooligan } from "@/types";
 import type { FightResult, HooliganArrestResult } from "@/lib/gevecht/types";
 import { PHASE_ORDER } from "@/lib/week-phase";
 import { applyConsumableBreakage, type BrokenEquipmentEntry } from "@/lib/economy/consumables";
@@ -12,16 +12,36 @@ import {
   type DarkWebPurchaseResult,
 } from "@/lib/economy/purchase";
 import { getShopItem } from "@/lib/economy/shop-items";
+import { getClubsByDivision } from "@/lib/divisie/clubs";
+import { areRivals } from "@/lib/divisie/rivalries";
+import {
+  applyStanding,
+  evaluateSeasonStanding,
+  generateOpponentOrder,
+  opponentForMatchIndex,
+  pointsForOutcome,
+  seasonLengthForDivision,
+} from "@/lib/divisie/season";
+import type { SeasonMatchResult, SeasonStandingResult } from "@/lib/divisie/types";
+import { pickOne } from "@/lib/gevecht/generate-team";
 import { BASE_FORM } from "@/lib/gok/constants";
 import { generateMatch, resolveMatch } from "@/lib/gok/match";
 import type { Bet, FootballMatch, MatchOutcome, MatchResult } from "@/lib/gok/types";
 
 const FALLBACK_CLUB_NAME = "Eigen club";
 
+/** Startdivisie voor een nieuw spel: de laagste, Divisie 3 (design §8). */
+const STARTING_DIVISION: Division = 3;
+
+/** Eigen club, willekeurig toegewezen uit de startdivisie bij het begin van een nieuw spel (MVP 8). */
+const startingClub = pickOne(getClubsByDivision(STARTING_DIVISION));
+const initialSeasonOpponentOrder = generateOpponentOrder(startingClub.id, STARTING_DIVISION);
+const initialOpponentClubId = opponentForMatchIndex(initialSeasonOpponentOrder, 0);
+
 const INITIAL_STATE: GameState = {
   currentWeek: 1,
   currentPhase: "voorbereiding",
-  division: 3,
+  division: STARTING_DIVISION,
   policeGaugePercent: 0,
   gang: {
     id: "player-gang",
@@ -29,7 +49,7 @@ const INITIAL_STATE: GameState = {
     roster: [],
     money: 500,
     notoriety: 0,
-    favoriteClub: "",
+    favoriteClub: startingClub.name,
     inventory: [],
   },
 };
@@ -78,6 +98,16 @@ interface GameStore extends GameState {
    * een verlies van de eigen club, verdwijnt weer na dat ene gevecht (design §5).
    */
   playerAggressionBoostActive: boolean;
+  /** Eigen club-referentie in de divisie-data (zie lib/divisie/clubs.ts) — vast voor de hele game. */
+  ownClubId: string;
+  /** Tegenstander-club voor de huidige week, bepaald bij het ingaan van elke voorbereiding-fase. */
+  currentOpponentClubId: string;
+  /** Geschudde tegenstander-volgorde (round-robin) voor het lopende seizoen in de huidige divisie. */
+  seasonOpponentOrder: string[];
+  /** Resultaten van dit seizoen tot nu toe, gebruikt voor promotie/degradatie (design §8). */
+  seasonResults: SeasonMatchResult[];
+  /** Promotie/degradatie-uitslag van het zojuist afgesloten seizoen, of null (design §8). */
+  lastSeasonStanding: SeasonStandingResult | null;
 
   /** Plaatst een weddenschap op `currentMatch` en schrijft de inzet direct af (design §5). */
   placeBet: (outcome: MatchOutcome, amount: number) => void;
@@ -126,6 +156,11 @@ export const useGameStore = create<GameStore>((set) => ({
   currentBet: null,
   matchResult: null,
   playerAggressionBoostActive: false,
+  ownClubId: startingClub.id,
+  currentOpponentClubId: initialOpponentClubId,
+  seasonOpponentOrder: initialSeasonOpponentOrder,
+  seasonResults: [],
+  lastSeasonStanding: null,
   placeBet: (outcome, amount) =>
     set((state) => {
       if (state.currentBet || state.matchResult) return state;
@@ -159,9 +194,39 @@ export const useGameStore = create<GameStore>((set) => ({
         const nextWeek = state.currentWeek + 1;
         const nextForm = state.currentMatch.form;
 
+        // Seizoen loopt af zodra elke tegenstander in de divisie (min. 1x) gespeeld is (design §8).
+        const seasonComplete =
+          state.seasonResults.length >= seasonLengthForDivision(state.division);
+
+        let nextDivision = state.division;
+        let lastSeasonStanding: SeasonStandingResult | null = null;
+        let nextSeasonResults = state.seasonResults;
+        let nextOpponentOrder = state.seasonOpponentOrder;
+
+        if (seasonComplete) {
+          const totalPoints = state.seasonResults.reduce((sum, entry) => sum + entry.points, 0);
+          const standing = evaluateSeasonStanding(totalPoints, state.seasonResults.length);
+          nextDivision = applyStanding(state.division, standing);
+          lastSeasonStanding = {
+            standing,
+            fromDivision: state.division,
+            toDivision: nextDivision,
+            points: totalPoints,
+            maxPoints: state.seasonResults.length * 3,
+          };
+          nextSeasonResults = [];
+          nextOpponentOrder = generateOpponentOrder(state.ownClubId, nextDivision);
+        }
+
+        const nextOpponentClubId = opponentForMatchIndex(
+          nextOpponentOrder,
+          nextSeasonResults.length,
+        );
+
         return {
           currentPhase: PHASE_ORDER[0],
           currentWeek: nextWeek,
+          division: nextDivision,
           gang: { ...state.gang, money: state.gang.money + income.total },
           lastWeekIncome: income,
           currentMatch: generateMatch(
@@ -173,6 +238,10 @@ export const useGameStore = create<GameStore>((set) => ({
           currentBet: null,
           matchResult: null,
           playerAggressionBoostActive: false,
+          seasonResults: nextSeasonResults,
+          seasonOpponentOrder: nextOpponentOrder,
+          currentOpponentClubId: nextOpponentClubId,
+          lastSeasonStanding,
         };
       }
 
@@ -199,6 +268,14 @@ export const useGameStore = create<GameStore>((set) => ({
       );
       const { roster, broken } = applyConsumableBreakage(rosterAfterArrests);
 
+      const seasonEntry: SeasonMatchResult = {
+        week: state.currentWeek,
+        opponentClubId: state.currentOpponentClubId,
+        outcome: result.outcome,
+        isRivalMatch: areRivals(state.ownClubId, state.currentOpponentClubId),
+        points: pointsForOutcome(result.outcome),
+      };
+
       return {
         gang: { ...state.gang, roster },
         policeGaugePercent: result.nextPoliceGaugeStartPercent,
@@ -206,6 +283,7 @@ export const useGameStore = create<GameStore>((set) => ({
         lastConsumableBreakage: broken,
         // De agressie-boost geldt maar voor dit ene gevecht (design §5).
         playerAggressionBoostActive: false,
+        seasonResults: [...state.seasonResults, seasonEntry],
       };
     }),
   buyBouwmarktItem: (itemId) =>

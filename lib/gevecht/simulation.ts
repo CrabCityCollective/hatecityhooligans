@@ -22,6 +22,7 @@ import {
   MAX_POLICE_GAUGE_START_PERCENT,
   POLICE_GAUGE_MAX_PERCENT_PER_SECOND,
   POLICE_GAUGE_PERCENT_PER_SECOND_PER_NOTORIETY,
+  RIVAL_MATCH_HATE_SCORE_BONUS,
   VECHTSPORT_DAMAGE_MULTIPLIER,
 } from "./constants";
 import { equipmentDamageMultiplier } from "./equipment-modifiers";
@@ -52,6 +53,7 @@ export const DEFAULT_FIGHT_CONFIG: FightConfig = {
   notoriety: 0,
   startingPoliceGaugePercent: 0,
   playerAggressionBoostActive: false,
+  isRivalMatch: false,
 };
 
 const SPAWN_MARGIN = 60;
@@ -156,10 +158,22 @@ function isAggressionBoosted(team: TeamId, config: FightConfig): boolean {
   return config.playerAggressionBoostActive && team === "player";
 }
 
-/** Haat-score, verhoogd met de agressieboost-bonus als die voor deze aanvaller actief is. */
-function effectiveHateScore(attacker: Hooligan, defender: Hooligan, boosted: boolean): number {
-  const score = computeHateScore(attacker, defender);
-  return boosted ? score + AGGRESSION_BOOST_HATE_SCORE_BONUS : score;
+/** True als deze aanvaller-team dit gevecht tegen een vastgelegde rivaal-club vecht (design §9). */
+function isRivalMatchActive(team: TeamId, config: FightConfig): boolean {
+  return config.isRivalMatch && team === "player";
+}
+
+/** Haat-score, verhoogd met de agressieboost- en/of rivaal-bonus als die voor deze aanvaller actief zijn. */
+function effectiveHateScore(
+  attacker: Hooligan,
+  defender: Hooligan,
+  team: TeamId,
+  config: FightConfig,
+): number {
+  let score = computeHateScore(attacker, defender);
+  if (isAggressionBoosted(team, config)) score += AGGRESSION_BOOST_HATE_SCORE_BONUS;
+  if (isRivalMatchActive(team, config)) score += RIVAL_MATCH_HATE_SCORE_BONUS;
+  return score;
 }
 
 /** Elke vrije hooligan zoekt (opnieuw) het hoogst scorende, nog levende/actieve doelwit. */
@@ -178,11 +192,10 @@ function assignTargets(combatants: Combatant[], config: FightConfig): void {
       continue;
     }
 
-    const boosted = isAggressionBoosted(combatant.team, config);
     let bestTarget = enemies[0];
-    let bestScore = effectiveHateScore(combatant.hooligan, bestTarget.hooligan, boosted);
+    let bestScore = effectiveHateScore(combatant.hooligan, bestTarget.hooligan, combatant.team, config);
     for (const enemy of enemies.slice(1)) {
-      const score = effectiveHateScore(combatant.hooligan, enemy.hooligan, boosted);
+      const score = effectiveHateScore(combatant.hooligan, enemy.hooligan, combatant.team, config);
       if (score > bestScore) {
         bestTarget = enemy;
         bestScore = score;
@@ -268,13 +281,14 @@ function computeDamage(
   attacker: Hooligan,
   defender: Hooligan,
   dtSeconds: number,
-  boosted: boolean,
+  team: TeamId,
+  config: FightConfig,
 ): number {
   let dps = BASE_DAMAGE_PER_SECOND;
   dps *= heeftVechtsportTrait(attacker) ? VECHTSPORT_DAMAGE_MULTIPLIER : 1;
   dps *= equipmentDamageMultiplier(attacker.equipment);
-  dps *= 1 + effectiveHateScore(attacker, defender, boosted) * HATE_DAMAGE_BONUS_PER_POINT;
-  dps *= boosted ? AGGRESSION_BOOST_DAMAGE_MULTIPLIER : 1;
+  dps *= 1 + effectiveHateScore(attacker, defender, team, config) * HATE_DAMAGE_BONUS_PER_POINT;
+  dps *= isAggressionBoosted(team, config) ? AGGRESSION_BOOST_DAMAGE_MULTIPLIER : 1;
 
   if (isDronken(attacker)) {
     if (Math.random() < DRONKEN_MISS_CHANCE) return 0;
@@ -317,12 +331,11 @@ function resolveDamage(
       const defenders = participants.filter((c) => c.team !== team);
       if (attackers.length === 0 || defenders.length === 0) continue;
 
-      const boosted = isAggressionBoosted(team, config);
       for (const attacker of attackers) {
         const focus = defenders.reduce((weakest, current) =>
           current.health < weakest.health ? current : weakest,
         );
-        const damage = computeDamage(attacker.hooligan, focus.hooligan, dtSeconds, boosted);
+        const damage = computeDamage(attacker.hooligan, focus.hooligan, dtSeconds, team, config);
         focus.health -= damage;
         if (focus.health <= 0 && focus.state === "fighting") {
           handleLethalHit(focus);

@@ -93,6 +93,8 @@ export interface FightConfig {
    * dit ene gevecht.
    */
   playerAggressionBoostActive: boolean;
+  /** True als de tegenstander deze week een vastgelegde rivaal is van de eigen club (design §9). */
+  isRivalMatch: boolean;
 }
 
 export interface FightState {

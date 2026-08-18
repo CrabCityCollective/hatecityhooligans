@@ -1,10 +1,16 @@
 "use client";
 
 import { useGameStore } from "@/lib/store/use-game-store";
+import { GameOverScreen } from "@/components/game-over-screen";
+import { isGangCollapsed } from "@/lib/divisie/game-over";
 
 export function ResultaatPhase() {
   const gang = useGameStore((state) => state.gang);
   const lastConsumableBreakage = useGameStore((state) => state.lastConsumableBreakage);
+
+  if (isGangCollapsed(gang)) {
+    return <GameOverScreen gang={gang} />;
+  }
 
   return (
     <section>
