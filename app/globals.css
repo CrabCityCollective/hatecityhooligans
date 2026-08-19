@@ -24,3 +24,32 @@ main {
   margin: 0 auto;
   padding: 2rem 1.5rem;
 }
+
+.title-screen {
+  text-align: center;
+  padding-bottom: 1.75rem;
+  margin-bottom: 2rem;
+  border-bottom: 4px solid #262626;
+}
+
+.title-screen__title {
+  margin: 0;
+  font-size: clamp(2rem, 8vw, 3.25rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #e2472b;
+  text-shadow:
+    3px 3px 0 #4a0f08,
+    6px 6px 0 rgba(0, 0, 0, 0.5);
+}
+
+.title-screen__subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 1.1rem 0 0;
+  color: #b8b8b8;
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+}
